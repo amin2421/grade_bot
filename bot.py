@@ -24,7 +24,7 @@ def run_web_server():
 
 # بقیه کدهای قبلی شما (بدون تغییر)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger = logging.getLogger(name)
+logger = logging.getLogger(__name__)
 
 def search_grade(name: str, student_id: str) -> str:
     # ... (همان تابع قبلی شما، بدون تغییر) ...
@@ -78,6 +78,7 @@ def main():
 
 if__name__ == '__main__':
     main()
+
 
 
 
