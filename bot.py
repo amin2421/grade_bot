@@ -76,5 +76,6 @@ def main():
     print("🤖 ربات تلگرام فعال شد!")
     telegram_app.run_polling()
 
-if name == 'main':
+if__name__ == __'main'__:
     main()
+
