@@ -43,7 +43,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text('❌ اطلاعات یافت نشد')
 
 async def start(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text('سلام! برای دریافت نمره، نام ونام خانوادگی و شماره دانشجویی خود را به شکل زیر ارسال کنید:\n\n«نام و تام خانوادگی، شماره دانشجویی»\n\nمثال:\nبهنام احمدی، 401123456')
+    await update.message.reply_text('سلام! برای دریافت نمره، نام و نام خانوادگی و شماره دانشجویی خود را به شکل زیر ارسال کنید:\n\n نام و نام خانوادگی، شماره دانشجویی \n\nمثال:\nبهنام احمدی،401123456')
 
 def main():
     # استفاده از Application به جای Updater[citation:8]
@@ -57,4 +57,5 @@ def main():
     app.run_polling()
 
 if __name__ == '__main__':
+
     main()
