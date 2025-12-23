@@ -79,7 +79,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
             parts = text.split(',')
         
         if len(parts) != 2:
-            await update.message.reply_text('⚠️ فرمت صحیح: «نام خانوادگی، شماره دانشجویی»')
+            await update.message.reply_text('⚠️ (لاتین)فرمت صحیح: «نام و نام خانوادگی، شماره دانشجویی»')
             return
         
         name, student_id = parts[0].strip(), parts[1].strip()
@@ -89,7 +89,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text(f'✅ نمره شما: {grade}')
             logger.info(f"نمره یافت شد: {name} -> {grade}")
         else:
-            await update.message.reply_text('❌ اطلاعات یافت نشد. لطفاً بررسی کنید.')
+            await update.message.reply_text( اطلاعات یافت نشد🥴. لطفاً بررسی کنید.')
             logger.info(f"نمره یافت نشد: {name}, {student_id}")
             
     except Exception as e:
@@ -102,10 +102,10 @@ async def start(update: Update, context: CallbackContext) -> None:
     
     برای دریافت نمره، اطلاعات خود را به این شکل ارسال کنید:
     
-    **«نام خانوادگی، شماره دانشجویی»**
+    (لاتین)نام و نام خانوادگی، شماره دانشجویی
     
     مثال:
-    `احمدی، 401123456`
+    `بهنام احمدی،401123456 `
     """
     await update.message.reply_text(welcome_text)
 
@@ -144,3 +144,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
