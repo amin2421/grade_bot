@@ -89,7 +89,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text(f'✅ نمره شما: {grade}')
             logger.info(f"نمره یافت شد: {name} -> {grade}")
         else:
-            await update.message.reply_text( اطلاعات یافت نشد🥴. لطفاً بررسی کنید.')
+            await update.message.reply_text( ❌اطلاعات یافت نشد. لطفاً بررسی کنید.')
             logger.info(f"نمره یافت نشد: {name}, {student_id}")
             
     except Exception as e:
@@ -144,4 +144,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
