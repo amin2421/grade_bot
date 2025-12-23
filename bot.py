@@ -4,6 +4,7 @@ import os
 import sys
 from threading import Thread
 import time
+from waitress import serve  # تغییر: استفاده از Waitress برای production
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext, filters
@@ -11,7 +12,7 @@ from flask import Flask
 
 TOKEN = "8255204107:AAF4_v6kvDiYZEuOuwClrh4Dd4MHGhOWpFE"
 
-# ========== خطایابی اولیه ==========
+# ========== خطایابی ==========
 print("=" * 50)
 print(f"شروع اجرا در: {time.ctime()}")
 print("=" * 50)
@@ -33,14 +34,18 @@ def health_check():
     return "OK", 200
 
 def run_web_server():
+    """اجرای سرور وب با Waitress (مناسب برای production)"""
     try:
         port = int(os.environ.get('PORT', 10000))
-        print(f"🌐 سرور وب روی پورت {port} راه‌اندازی می‌شود...")
-        web_app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+        print(f"🌐 سرور وب (Waitress) روی پورت {port} راه‌اندازی می‌شود...")
+        
+        # استفاده از Waitress به جای flask.run
+        serve(web_app, host='0.0.0.0', port=port, threads=1)
+        
     except Exception as e:
         print(f"❌ خطای سرور وب: {e}")
 
-# ========== ربات تلگرام ==========
+# ========== بقیه کد شما (بدون تغییر) ==========
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -48,7 +53,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def search_grade(name: str, student_id: str) -> str:
-    """جستجوی نمره در فایل CSV"""
     try:
         if not os.path.exists('grades.csv'):
             print("❌ فایل grades.csv یافت نشد!")
@@ -67,19 +71,17 @@ def search_grade(name: str, student_id: str) -> str:
         return None
 
 async def handle_message(update: Update, context: CallbackContext) -> None:
-    """پردازش پیام کاربر"""
     try:
         text = update.message.text.strip()
         logger.info(f"پیام دریافتی: {text}")
         
-        # جدا کردن نام و شماره دانشجویی
         if '،' in text:
             parts = text.split('،')
         else:
             parts = text.split(',')
         
         if len(parts) != 2:
-            await update.message.reply_text('⚠️ (لاتین)فرمت صحیح: «نام و نام خانوادگی، شماره دانشجویی»')
+            await update.message.reply_text('⚠️ فرمت صحیح: «نام و نام خانوادگی، شماره دانشجویی»')
             return
         
         name, student_id = parts[0].strip(), parts[1].strip()
@@ -89,53 +91,48 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text(f'✅ نمره شما: {grade}')
             logger.info(f"نمره یافت شد: {name} -> {grade}")
         else:
-            await update.message.reply_text( ❌اطلاعات یافت نشد. لطفاً بررسی کنید.')
+            await update.message.reply_text('❌ اطلاعات یافت نشد. لطفاً بررسی کنید.')
             logger.info(f"نمره یافت نشد: {name}, {student_id}")
             
     except Exception as e:
         logger.error(f"خطا در پردازش پیام: {e}")
 
 async def start(update: Update, context: CallbackContext) -> None:
-    """دستور /start"""
     welcome_text = """
     سلام! 👋
     
     برای دریافت نمره، اطلاعات خود را به این شکل ارسال کنید:
     
-    (لاتین)نام و نام خانوادگی، شماره دانشجویی
+    نام و نام خانوادگی، شماره دانشجویی
     
     مثال:
-    `بهنام احمدی،401123456 `
+    بهنام احمدی،401123456 
     """
     await update.message.reply_text(welcome_text)
 
 def main():
-    """تابع اصلی"""
     print("🚀 در حال راه‌اندازی سرویس...")
     
     # راه‌اندازی سرور وب در نخ جداگانه
     server_thread = Thread(target=run_web_server, daemon=True)
     server_thread.start()
-    print("🌐 سرور وب فعال شد")
-    time.sleep(1)  # فرصت برای شروع سرور
+    print("🌐 سرور وب (Waitress) فعال شد")
+    time.sleep(2)
     
     # راه‌اندازی ربات تلگرام
     try:
         print("🤖 در حال راه‌اندازی ربات تلگرام...")
         application = Application.builder().token(TOKEN).build()
         
-        # ثبت دستورات
         application.add_handler(CommandHandler("start", start))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
         print("✅ ربات تلگرام آماده است!")
         print("=" * 50)
         
-        # اجرای ربات - پارامتر مشکل‌دار حذف شد
         application.run_polling(
             drop_pending_updates=True,
-            allowed_updates=Update.ALL_TYPES,
-            # close_loop_on_sigint=True  # این خط حذف شد
+            allowed_updates=Update.ALL_TYPES
         )
         
     except Exception as e:
@@ -144,5 +141,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
