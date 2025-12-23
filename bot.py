@@ -38,7 +38,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
     else:
         parts = text.split(',')
     if len(parts) != 2:
-        await update.message.reply_text('⚠️ فرمت صحیح: «نام و نام خانوادگی،شماره دانشجویی»')
+        await update.message.reply_text('⚠️ فرمت صحیح: «نام و نام خانوادگی،شماره و دانشجویی»')
         return
     name, student_id = parts[0].strip(), parts[1].strip()
     grade = search_grade(name, student_id)
@@ -67,3 +67,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
