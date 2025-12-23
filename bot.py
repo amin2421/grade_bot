@@ -1,193 +1,146 @@
-
-import csv
-import logging
 import os
+import csv
+import time
 import requests
 import threading
-import time
-import socket
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext, filters
-from flask import Flask
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
-# ==================== تنظیمات اولیه ====================
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-    handlers=[
-        logging.StreamHandler(),
-    ]
-)
-logger = logging.getLogger(__name__)
+# ==================== تنظیمات ساده ====================
+print("🚀 در حال راه‌اندازی ربات...")
 
-# 🔑 توکن ربات
-TOKEN = os.getenv('BOT_TOKEN', '8255204107:AAF4_v6kvDiYZEuOuwClrh4Dd4MHGhOWpFE')
+# دریافت توکن
+TOKEN = os.environ.get('BOT_TOKEN', '8255204107:AAF4_v6kvDiYZEuOuwClrh4Dd4MHGhOWpFE')
+print(f"✅ توکن دریافت شد: {TOKEN[:15]}...")
 
-# ==================== سیستم Keep-Alive ====================
-def keep_awake():
-    """هر ۵ دقیقه ربات را پینگ می‌کند تا نخوابد"""
+# ==================== Keep-Alive ساده ====================
+def ping_server():
+    """هر ۵ دقیقه سرور را پینگ می‌کند"""
     while True:
         try:
-            requests.get("https://Amin_Greadebot.onrender.com", timeout=10)
-            logger.info("✅ Keep-alive ping successful")
-        except Exception as e:
-            logger.warning(f"⚠️ Keep-alive failed: {e}")
+            # آدرس درست ربات شما (با خط تیره)
+            requests.get("https://amin-greadebot.onrender.com", timeout=5)
+            print(f"✅ {time.ctime()} - پینگ موفق")
+        except:
+            print(f"⚠️ {time.ctime()} - پینگ ناموفق")
+        
         time.sleep(300)  # هر ۵ دقیقه
 
-# ==================== پیدا کردن پورت آزاد ====================
-def find_free_port(start_port=8080, max_attempts=10):
-    """پیدا کردن یک پورت آزاد"""
-    for port in range(start_port, start_port + max_attempts):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('0.0.0.0', port))
-                return port
-        except OSError:
-            continue
-    return start_port  # اگر پورت آزاد پیدا نشد، همان پورت پیشفرض
+# شروع keep-alive
+thread = threading.Thread(target=ping_server, daemon=True)
+thread.start()
+print("🔄 سیستم Keep-Alive فعال شد")
 
-# ==================== سرور Flask برای Health Check ====================
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "🤖 ربات تلگرام نمره دانشجویان فعال است! ✅"
-
-@app.route('/health')
-def health():
-    return {"status": "healthy", "service": "telegram-grade-bot", "timestamp": time.time()}
-
-@app.route('/ping')
-def ping():
-    return "pong"
-
-def run_flask_server():
-    """اجرای Flask در پس‌زمینه با پورت آزاد"""
-    port = find_free_port(8080)
-    logger.info(f"🌐 تلاش برای اجرای Flask روی پورت {port}")
-    app.run(host='0.0.0.0', port=port, debug=False, threaded=True, use_reloader=False)
-
-# ==================== منطق اصلی ربات ====================
-def search_grade(name: str, student_id: str) -> str:
+# ==================== منطق ربات ====================
+def find_grade(name: str, student_id: str) -> str:
     """جستجوی نمره در فایل CSV"""
     try:
-        with open('grades.csv', 'r', encoding='utf-8') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                if (row['name'].strip().lower() == name.strip().lower() and 
-                    row['student_id'].strip() == student_id.strip()):
-                    return row['grade']
-    except FileNotFoundError:
-        logger.error("فایل grades.csv یافت نشد!")
-        return None
+        with open('grades.csv', 'r', encoding='utf-8') as f:
+            # پیدا کردن ردیف با نام و شماره دانشجویی
+            for line in f:
+                if ',' in line:
+                    parts = line.strip().split(',')
+                    if len(parts) >= 3:
+                        file_name, file_id, grade = parts[0], parts[1], parts[2]
+                        if (file_name.strip().lower() == name.strip().lower() and 
+                            file_id.strip() == student_id.strip()):
+                            return grade
     except Exception as e:
-        logger.error(f"خطا در خواندن فایل: {e}")
+        print(f"خطا در خواندن فایل: {e}")
     return None
 
-async def handle_message(update: Update, context: CallbackContext) -> None:
-    """پردازش پیام‌های کاربر"""
+async def handle_message(update, context):
+    """پردازش پیام کاربر"""
     try:
         text = update.message.text.strip()
+        print(f"📥 دریافت پیام: {text}")
         
+        # جدا کردن نام و شماره دانشجویی
         if '،' in text:
-            parts = text.split('،')
+            name, student_id = text.split('،', 1)
         elif ',' in text:
-            parts = text.split(',')
-        elif ' ' in text and len(text.split(' ')) >= 2:
-            parts = text.split(' ', 1)
+            name, student_id = text.split(',', 1)
         else:
             await update.message.reply_text(
-                '⚠️ فرمت صحیح: نام و نام خانوادگی،شماره دانشجویی\nمثال: بهنام احمدی،401123450'
+                '⚠️ لطفاً اینگونه ارسال کنید:\n'
+                'نام و نام خانوادگی،شماره دانشجویی\n\n'
+                'مثال: بهنام احمدی،401123450'
             )
             return
         
-        if len(parts) != 2:
-            await update.message.reply_text('⚠️ لطفاً نام و شماره دانشجویی را با کاما جدا کنید.')
-            return
-            
-        name, student_id = parts[0].strip(), parts[1].strip()
+        name = name.strip()
+        student_id = student_id.strip()
         
-        logger.info(f"دریافت درخواست از: {name} - {student_id}")
+        # جستجوی نمره
+        grade = find_grade(name, student_id)
         
-        grade = search_grade(name, student_id)
         if grade:
-            await update.message.reply_text(f'✅ نمره شما: {grade}')
-            logger.info(f"نمره یافت شد: {grade}")
+            response = f'✅ نمره شما: {grade}'
+            print(f"📤 پاسخ: {name} → {grade}")
         else:
-            await update.message.reply_text('❌ اطلاعات یافت نشد')
-            logger.warning(f"نمره یافت نشد")
-            
+            response = '❌ اطلاعات یافت نشد'
+            print(f"⚠️ یافت نشد: {name}, {student_id}")
+        
+        await update.message.reply_text(response)
+        
     except Exception as e:
-        logger.error(f"خطا در پردازش پیام: {e}")
-        await update.message.reply_text('❌ خطایی رخ داد. لطفاً دوباره تلاش کنید.')
+        print(f"💥 خطا: {e}")
+        await update.message.reply_text('❌ خطا در پردازش')
 
-async def start(update: Update, context: CallbackContext) -> None:
+async def start_command(update, context):
     """دستور /start"""
-    user = update.effective_user
     await update.message.reply_text(
-        f'سلام {user.first_name}! 👋\n'
-        f'برای دریافت نمره، نام و شماره دانشجویی خود را ارسال کنید.\n\n'
-        f'فرمت: نام و نام خانوادگی،شماره دانشجویی\n'
-        f'مثال: بهنام احمدی،401123450'
+        '👋 سلام!\n\n'
+        'برای دریافت نمره، نام و شماره دانشجویی خود را ارسال کنید:\n\n'
+        '📝 فرمت:\n'
+        'نام و نام خانوادگی،شماره دانشجویی\n\n'
+        'مثال:\n'
+        'بهنام احمدی،401123450\n'
+        'فاطمه محمدی،401123451'
     )
 
-# ==================== تابع اصلی ساده شده ====================
-def main():
-    """تابع اصلی راه‌اندازی ربات"""
-    logger.info("🚀 شروع راه‌اندازی ربات...")
-    
-    # شروع Keep-Alive
-    keep_alive_thread = threading.Thread(target=keep_awake, daemon=True)
-    keep_alive_thread.start()
-    logger.info("🔄 Keep-Alive فعال شد")
-    
-    # شروع Flask (اگر پورت آزاد بود)
+# ==================== اجرای اصلی ====================
+def run_bot():
+    """تابع اصلی اجرای ربات"""
     try:
-        flask_thread = threading.Thread(target=run_flask_server, daemon=True)
-        flask_thread.start()
-        logger.info("🌐 Flask شروع شد")
-    except Exception as e:
-        logger.warning(f"⚠️ Flask شروع نشد: {e}")
-    
-    # راه‌اندازی ربات تلگرام
-    try:
-        application = Application.builder().token(TOKEN).build()
+        # ایجاد برنامه
+        app = Application.builder().token(TOKEN).build()
         
-        # اضافه کردن handlers
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        # اضافه کردن دستورات
+        app.add_handler(CommandHandler("start", start_command))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
-        logger.info("🤖 ربات تلگرام در حال شروع...")
+        print("🤖 ربات فعال و آماده است...")
+        print("📍 آدرس: https://amin-greadebot.onrender.com")
+        print("⏰ Keep-Alive: هر ۵ دقیقه")
         
-        # اجرای ساده ربات
-        application.run_polling(
+        # اجرای ربات
+        app.run_polling(
             drop_pending_updates=True,
             poll_interval=1.0,
-            timeout=30,
-            close_loop=False
+            timeout=30
         )
         
     except Exception as e:
-        logger.critical(f"💥 خطا در ربات: {e}")
-        raise
+        print(f"💥 خطای شدید: {e}")
+        return False
+    
+    return True
 
 if __name__ == '__main__':
-    # اجرای اصلی با restart اتوماتیک
-    restart_count = 0
-    max_restarts = 5
+    # اجرا با restart اتوماتیک
+    attempts = 0
+    max_attempts = 10
     
-    while restart_count < max_restarts:
-        try:
-            logger.info(f"🔄 تلاش {restart_count + 1}/{max_restarts}")
-            main()
-        except KeyboardInterrupt:
-            logger.info("توقف توسط کاربر")
+    while attempts < max_attempts:
+        attempts += 1
+        print(f"\n🔄 تلاش شماره {attempts}")
+        
+        if run_bot():
+            print("ربات به صورت طبیعی متوقف شد")
             break
-        except Exception as e:
-            restart_count += 1
-            logger.error(f"ربات متوقف شد: {e}")
-            if restart_count < max_restarts:
-                logger.info(f"⏳ صبر برای تلاش مجدد... (15 ثانیه)")
-                time.sleep(15)
-    
-    logger.error("❌ ربات کاملاً متوقف شد")
+        else:
+            if attempts < max_attempts:
+                print(f"⏳ ۱۰ ثانیه صبر برای تلاش مجدد...")
+                time.sleep(10)
+            else:
+                print("❌ بیش از حد تلاش ناموفق")
