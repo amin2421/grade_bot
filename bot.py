@@ -11,7 +11,11 @@ from flask import Flask
 # ==================== تنظیمات اولیه ====================
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    level=logging.INFO,
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('bot_errors.log')
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -40,10 +44,11 @@ def home():
     <head>
         <title>ربات نمره دانشجویان</title>
         <style>
-            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+            body { font-family: Tahoma, sans-serif; text-align: center; padding: 50px; direction: rtl; }
             h1 { color: #2c3e50; }
             .status { color: #27ae60; font-size: 20px; margin: 20px 0; }
-            .info { background: #f8f9fa; padding: 20px; border-radius: 10px; display: inline-block; }
+            .info { background: #f8f9fa; padding: 20px; border-radius: 10px; display: inline-block; margin: 20px auto; }
+            .footer { margin-top: 30px; color: #7f8c8d; font-size: 14px; }
         </style>
     </head>
     <body>
@@ -51,7 +56,12 @@ def home():
         <div class="status">✅ سرویس فعال و در حال اجرا</div>
         <div class="info">
             <p><strong>آدرس ربات:</strong> https://Amin_Greadebot.onrender.com</p>
+            <p><strong>وضعیت:</strong> آنلاین</p>
             <p><strong>آخرین بروزرسانی:</strong> """ + time.ctime() + """</p>
+            <p><strong>Health Check:</strong> <a href="/health">/health</a></p>
+        </div>
+        <div class="footer">
+            ربات طراحی شده برای دریافت نمرات دانشجویان
         </div>
     </body>
     </html>
@@ -81,7 +91,7 @@ def search_grade(name: str, student_id: str) -> str:
                     return row['grade']
     except FileNotFoundError:
         logger.error("فایل grades.csv یافت نشد!")
-        return "خطا: فایل نمرات موجود نیست"
+        return None
     except Exception as e:
         logger.error(f"خطا در خواندن فایل: {e}")
     return None
@@ -102,9 +112,11 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text(
                 '⚠️ فرمت صحیح:\n'
                 '• نام و نام خانوادگی،شماره دانشجویی\n'
-                '• نام و نام خانوادگی شماره دانشجویی\n'
-                '\nمثال:\nبهنام احمدی،401123450\n'
-                'یا\nبهنام احمدی 401123450'
+                '• نام و نام خانوادگی شماره دانشجویی\n\n'
+                'مثال:\n'
+                '`بهنام احمدی،401123450`\n'
+                'یا\n'
+                '`بهنام احمدی 401123450`'
             )
             return
         
@@ -115,60 +127,68 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         name, student_id = parts[0].strip(), parts[1].strip()
         
         # لاگ دریافت درخواست
-        logger.info(f"دریافت درخواست از: {name} - {student_id}")
+        logger.info(f"📥 دریافت درخواست از: {name} - {student_id}")
         
         grade = search_grade(name, student_id)
         if grade:
-            await update.message.reply_text(f'✅ نمره شما: {grade}')
-            logger.info(f"نمره یافت شد برای {name}: {grade}")
+            response = f'✅ نمره شما: {grade}'
+            await update.message.reply_text(response)
+            logger.info(f"📤 پاسخ داده شد: {name} → {grade}")
         else:
-            await update.message.reply_text(
-                '❌ اطلاعات یافت نشد\n'
+            response = (
+                '❌ اطلاعات یافت نشد\n\n'
                 'لطفاً بررسی کنید:\n'
-                '1. نام و نام خانوادگی را کامل وارد کرده باشید\n'
-                '2. شماره دانشجویی را درست وارد کرده باشید\n'
-                '3. از حروف فارسی استفاده کنید'
+                '• نام و نام خانوادگی را کامل وارد کرده باشید\n'
+                '• شماره دانشجویی را درست وارد کرده باشید\n'
+                '• از حروف فارسی استفاده کنید'
             )
-            logger.warning(f"نمره یافت نشد برای: {name} - {student_id}")
+            await update.message.reply_text(response)
+            logger.warning(f"⚠️ نمره یافت نشد برای: {name} - {student_id}")
             
     except Exception as e:
-        logger.error(f"خطا در پردازش پیام: {e}")
+        logger.error(f"💥 خطا در پردازش پیام: {e}", exc_info=True)
         await update.message.reply_text('❌ خطایی رخ داد. لطفاً دوباره تلاش کنید.')
 
 async def start(update: Update, context: CallbackContext) -> None:
     """دستور /start"""
     user = update.effective_user
     welcome_text = (
-        f'سلام {user.first_name}! 👋\n'
+        f'سلام {user.first_name}! 👋\n\n'
         f'به ربات دریافت نمره خوش آمدید.\n\n'
-        f'📝 برای دریافت نمره، نام و نام خانوادگی و شماره دانشجویی خود را ارسال کنید:\n\n'
-        f'• فرمت اول: نام و نام خانوادگی،شماره دانشجویی\n'
-        f'• فرمت دوم: نام و نام خانوادگی شماره دانشجویی\n\n'
-        f'مثال‌ها:\n'
+        f'📝 **دستورالعمل استفاده:**\n'
+        f'نام و نام خانوادگی و شماره دانشجویی خود را به یکی از فرمت‌های زیر ارسال کنید:\n\n'
+        f'• `نام و نام خانوادگی،شماره دانشجویی`\n'
+        f'• `نام و نام خانوادگی شماره دانشجویی`\n\n'
+        f'**مثال‌ها:**\n'
         f'`بهنام احمدی،401123450`\n'
-        f'یا\n'
         f'`بهنام احمدی 401123450`\n\n'
-        f'📍 آدرس وب سرویس: https://Amin_Greadebot.onrender.com\n'
-        f'🔄 وضعیت سرویس: فعال ✅'
+        f'📍 **آدرس وب سرویس:**\n'
+        f'https://Amin_Greadebot.onrender.com\n\n'
+        f'🔧 **دستورات قابل استفاده:**\n'
+        f'/start - راهنمایی\n'
+        f'/status - وضعیت ربات\n'
+        f'/ping - تست پاسخ‌دهی'
     )
     await update.message.reply_text(welcome_text)
 
 async def status(update: Update, context: CallbackContext) -> None:
     """دستور /status برای چک وضعیت"""
     status_text = (
-        '📊 وضعیت سرویس:\n'
-        '• ربات: فعال ✅\n'
-        '• سرور: Render\n'
-        '• آدرس: https://Amin_Greadebot.onrender.com\n'
-        '• آخرین بروزرسانی: ' + time.ctime() + '\n'
-        '• Keep-alive: فعال (هر ۴ دقیقه)\n'
-        '• Health Check: /health ✅'
+        '📊 **وضعیت سرویس:**\n\n'
+        '• 🤖 ربات: فعال ✅\n'
+        '• 🖥️ سرور: Render\n'
+        '• 🌐 آدرس: https://Amin_Greadebot.onrender.com\n'
+        '• 🕐 آخرین بروزرسانی: ' + time.ctime() + '\n'
+        '• 🔄 Keep-alive: فعال (هر ۴ دقیقه)\n'
+        '• 🩺 Health Check: /health ✅\n\n'
+        '📈 **آمار:**\n'
+        '• Uptime: ' + str(round(time.time() - start_time)) + ' ثانیه'
     )
     await update.message.reply_text(status_text)
 
 async def error_handler(update: Update, context: CallbackContext):
     """مدیریت خطاهای全局"""
-    logger.error(f"خطا در پردازش آپدیت: {context.error}", exc_info=context.error)
+    logger.error(f"🔥 خطا در پردازش آپدیت: {context.error}", exc_info=True)
     if update and update.effective_message:
         try:
             await update.effective_message.reply_text(
@@ -179,8 +199,11 @@ async def error_handler(update: Update, context: CallbackContext):
             pass
 
 # ==================== تابع اصلی ====================
-def main():
+def run_bot():
     """تابع اصلی راه‌اندازی ربات"""
+    global start_time
+    start_time = time.time()
+    
     logger.info("🚀 در حال راه‌اندازی سرویس...")
     
     # 1. شروع سیستم Keep-Alive
@@ -195,55 +218,59 @@ def main():
     
     # 3. راه‌اندازی ربات تلگرام
     try:
-        telegram_app = Application.builder().token(TOKEN).build()
+        # ساخت Application
+        application = Application.builder().token(TOKEN).build()
         
         # اضافه کردن handlers
-        telegram_app.add_handler(CommandHandler("start", start))
-        telegram_app.add_handler(CommandHandler("status", status))
-        telegram_app.add_handler(CommandHandler("ping", status))
-        telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("status", status))
+        application.add_handler(CommandHandler("ping", status))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
         # اضافه کردن error handler
-        telegram_app.add_error_handler(error_handler)
+        application.add_error_handler(error_handler)
         
         logger.info("🤖 ربات تلگرام در حال راه‌اندازی...")
         
-        # تنظیمات polling برای پایداری بیشتر
-        telegram_app.run_polling(
-            drop_pending_updates=True,
-            poll_interval=1.0,  # افزایش interval برای کاهش بار
-            timeout=30,
-            read_timeout=30,
-            write_timeout=30,
-            connect_timeout=30,
-            pool_timeout=30,
-            bootstrap_retries=-1,  # تلاش بی‌نهایت برای reconnect
-            allowed_updates=None
+        # اجرای ربات با run_polling (روش صحیح در v20)
+        application.run_polling(
+            drop_pending_updates=True,      # حذف آپدیت‌های قدیمی
+            allowed_updates=Update.ALL_TYPES,
+            poll_interval=1.0,              # فاصله بین polling
+            poll_timeout=30.0,              # timeout برای polling
+            close_loop=False,               # جلوگیری از بسته شدن loop
+            stop_signals=None               # غیرفعال کردن سیگنال‌های توقف
         )
         
     except Exception as e:
-        logger.critical(f"💥 ربات متوقف شد: {e}")
-        # تلاش مجدد پس از ۱۰ ثانیه
-        logger.info("🔄 تلاش مجدد در ۱۰ ثانیه...")
-        time.sleep(10)
-        return False
-    
-    return True
+        logger.critical(f"💥 ربات متوقف شد: {e}", exc_info=True)
+        raise e
 
-if __name__ == '__main__':
-    # راه‌اندازی با قابلیت restart اتوماتیک
+def main():
+    """تابع اصلی با restart اتوماتیک"""
     restart_count = 0
-    max_restarts = 20
+    max_restarts = 10
     
     while restart_count < max_restarts:
-        logger.info(f"🔄 تلاش شماره {restart_count + 1} برای راه‌اندازی ربات...")
-        
-        if main():
-            logger.info("ربات به طور طبیعی متوقف شد.")
+        try:
+            logger.info(f"🔄 تلاش شماره {restart_count + 1} برای راه‌اندازی ربات...")
+            run_bot()
+            
+        except KeyboardInterrupt:
+            logger.info("👋 ربات توسط کاربر متوقف شد.")
             break
-        else:
+            
+        except Exception as e:
             restart_count += 1
-            logger.warning(f"ربات crashed. تلاش مجدد... ({restart_count}/{max_restarts})")
-    
-    if restart_count >= max_restarts:
-        logger.critical("❌ بیش از حد تلاش مجدد. ربات کاملاً متوقف شد.")
+            logger.error(f"💥 ربات crashed. تلاش مجدد {restart_count}/{max_restarts}")
+            logger.error(f"خطا: {e}")
+            
+            if restart_count < max_restarts:
+                logger.info(f"⏳ صبر برای تلاش مجدد... (۱۰ ثانیه)")
+                time.sleep(10)
+            else:
+                logger.critical("❌ بیش از حد تلاش مجدد. ربات کاملاً متوقف شد.")
+                break
+
+if __name__ == '__main__':
+    main()
