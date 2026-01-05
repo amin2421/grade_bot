@@ -11,6 +11,7 @@ from flask import Flask
 
 TOKEN = "8255204107:AAF4_v6kvDiYZEuOuwClrh4Dd4MHGhOWpFE"
 CHANNEL_ID = "@With_u_until_end"  # آیدی کانال شما
+CHANNEL_LINK = "https://t.me/+29MDo7noLR0xMzZk"  # لینک عمومی کانال
 
 print("=" * 50)
 print(f"شروع اجرا در: {time.ctime()}")
@@ -75,25 +76,6 @@ async def check_channel_membership(user_id: int, context: CallbackContext) -> bo
         logger.error(f"خطا در بررسی عضویت کانال: {e}")
         return False
 
-async def add_user_to_channel(user_id: int, context: CallbackContext) -> bool:
-    """اضافه کردن خودکار کاربر به کانال"""
-    try:
-        # ایجاد لینک دعوت
-        invite_link = await context.bot.create_chat_invite_link(
-            chat_id=CHANNEL_ID,
-            member_limit=1
-        )
-        
-        # ارسال لینک دعوت به کاربر
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=f"برای عضویت خودکار در کانال، روی این لینک کلیک کنید:\n{invite_link.invite_link}\n\nپس از عضویت، روی دکمه 'بررسی عضویت' کلیک کنید."
-        )
-        return True
-    except Exception as e:
-        logger.error(f"خطا در ایجاد لینک دعوت: {e}")
-        return False
-
 async def verify_membership(update: Update, context: CallbackContext) -> None:
     """بررسی عضویت کاربر با دکمه"""
     query = update.callback_query
@@ -114,45 +96,17 @@ async def verify_membership(update: Update, context: CallbackContext) -> None:
         )
     else:
         keyboard = [
-            [InlineKeyboardButton("➕ عضویت خودکار در کانال", callback_data="auto_join")],
+            [InlineKeyboardButton("📢 عضویت در کانال", url=CHANNEL_LINK)],
             [InlineKeyboardButton("✅ بررسی مجدد عضویت", callback_data="verify_membership")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
             "❌ هنوز در کانال عضو نیستید!\n\n"
-            "روی دکمه 'عضویت خودکار در کانال' کلیک کنید تا به طور خودکار به کانال اضافه شوید.",
+            "1. روی دکمه 'عضویت در کانال' کلیک کنید\n"
+            "2. پس از عضویت، روی 'بررسی مجدد عضویت' کلیک کنید\n\n"
+            f"🔗 لینک کانال: {CHANNEL_LINK}",
             reply_markup=reply_markup
-        )
-
-async def auto_join_channel(update: Update, context: CallbackContext) -> None:
-    """عضویت خودکار کاربر در کانال"""
-    query = update.callback_query
-    await query.answer()
-    
-    user_id = query.from_user.id
-    
-    # اضافه کردن کاربر به کانال
-    success = await add_user_to_channel(user_id, context)
-    
-    if success:
-        keyboard = [
-            [InlineKeyboardButton("✅ بررسی عضویت من", callback_data="verify_membership")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await query.edit_message_text(
-            "📩 لینک عضویت خودکار برای شما ارسال شد!\n\n"
-            "1. به پیام خصوصی ربات مراجعه کنید\n"
-            "2. روی لینک ارسال شده کلیک کنید\n"
-            "3. پس از عضویت، روی دکمه زیر کلیک کنید",
-            reply_markup=reply_markup
-        )
-    else:
-        await query.edit_message_text(
-            "❌ خطا در ایجاد لینک عضویت خودکار.\n\n"
-            "لطفاً دستی از طریق لینک زیر عضو شوید:\n"
-            "https://t.me/+29MDo7noLR0xMzZk"
         )
 
 async def handle_message(update: Update, context: CallbackContext) -> None:
@@ -165,15 +119,16 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         if user_id not in user_status or user_status[user_id] != "verified":
             # اگر کاربر تأیید نشده، پیام عضویت نشان داده شود
             keyboard = [
-                [InlineKeyboardButton("➕ عضویت خودکار در کانال", callback_data="auto_join")],
+                [InlineKeyboardButton("📢 عضویت در کانال", url=CHANNEL_LINK)],
                 [InlineKeyboardButton("✅ بررسی عضویت من", callback_data="verify_membership")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await update.message.reply_text(
                 "👋 برای استفاده از ربات، ابتدا باید در کانال ما عضو شوید:\n\n"
-                "روی دکمه 'عضویت خودکار در کانال' کلیک کنید تا به طور خودکار به کانال اضافه شوید.\n\n"
-                "پس از عضویت، روی 'بررسی عضویت من' کلیک کنید.",
+                "1. روی دکمه 'عضویت در کانال' کلیک کنید\n"
+                "2. پس از عضویت، روی 'بررسی عضویت من' کلیک کنید\n\n"
+                f"🔗 کانال: {CHANNEL_LINK}",
                 reply_markup=reply_markup
             )
             return
@@ -203,7 +158,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
 
 async def start(update: Update, context: CallbackContext) -> None:
     keyboard = [
-        [InlineKeyboardButton("➕ عضویت خودکار در کانال", callback_data="auto_join")],
+        [InlineKeyboardButton("📢 عضویت در کانال", url=CHANNEL_LINK)],
         [InlineKeyboardButton("✅ بررسی عضویت من", callback_data="verify_membership")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -213,11 +168,10 @@ async def start(update: Update, context: CallbackContext) -> None:
     
     برای دریافت نمره ابتدا باید در کانال ما عضو شوید:
     
-    روی دکمه 'عضویت خودکار در کانال' کلیک کنید تا به طور خودکار به کانال اضافه شوید.
+    1️⃣ روی دکمه 'عضویت در کانال' کلیک کنید
+    2️⃣ پس از عضویت، روی 'بررسی عضویت من' کلیک کنید
     
-    سپس روی 'بررسی عضویت من' کلیک کنید تا عضویت شما تأیید شود.
-    
-    بعد از تأیید عضویت، اطلاعات خود را به این شکل ارسال کنید:
+    سپس اطلاعات خود را به این شکل ارسال کنید:
     
     نام و نام خانوادگی،شماره دانشجویی
     
@@ -244,7 +198,6 @@ def main():
         
         # ثبت هندلر برای دکمه‌ها
         application.add_handler(CallbackQueryHandler(verify_membership, pattern="^verify_membership$"))
-        application.add_handler(CallbackQueryHandler(auto_join_channel, pattern="^auto_join$"))
         
         # ثبت هندلر برای پیام‌های متنی
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
