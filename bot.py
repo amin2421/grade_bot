@@ -10,7 +10,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackCo
 from flask import Flask
 
 TOKEN = "8255204107:AAF4_v6kvDiYZEuOuwClrh4Dd4MHGhOWpFE"
-CHANNEL_ID = -1001234567890  # آیدی عددی کانال شما (باید تغییر دهید)
+CHANNEL_ID = -1003457817555 # آیدی عددی کانال شما (باید تغییر دهید)
 CHANNEL_LINK = "https://t.me/+29MDo7noLR0xMzZk"  # لینک عمومی کانال
 
 print("=" * 50)
@@ -257,3 +257,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
