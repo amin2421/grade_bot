@@ -12,7 +12,7 @@ from flask import Flask
 TOKEN = "8255204107:AAF4_v6kvDiYZEuOuwClrh4Dd4MHGhOWpFE"
 CHANNEL_ID = -1003457817555  # آیدی عددی واقعی کانال شما
 CHANNEL_USERNAME = "@With_u_until_end"
-CHANNEL_LINK = "https://t.me/+29MDo7noLR0xMzZk"
+CHANNEL_LINK = "https://t.me/+uRCMurkr0KA5ODNk"
 
 print("=" * 50)
 print(f"شروع اجرا در: {time.ctime()}")
@@ -345,5 +345,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
 
