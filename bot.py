@@ -10,7 +10,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackCo
 from flask import Flask
 
 TOKEN = "8255204107:AAF4_v6kvDiYZEuOuwClrh4Dd4MHGhOWpFE"
-CHANNEL_ID = "@With_u_until_end"  # آیدی کانال شما
+CHANNEL_ID = -1001234567890  # آیدی عددی کانال شما (باید تغییر دهید)
 CHANNEL_LINK = "https://t.me/+29MDo7noLR0xMzZk"  # لینک عمومی کانال
 
 print("=" * 50)
@@ -70,10 +70,20 @@ def search_grade(name: str, student_id: str) -> str:
 async def check_channel_membership(user_id: int, context: CallbackContext) -> bool:
     """بررسی عضویت کاربر در کانال"""
     try:
+        # بررسی دقیق‌تر عضویت
         member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
-        return member.status in ['member', 'administrator', 'creator']
+        logger.info(f"وضعیت عضویت کاربر {user_id}: {member.status}")
+        
+        # وضعیت‌های مجاز
+        allowed_statuses = ['member', 'administrator', 'creator']
+        is_member = member.status in allowed_statuses
+        
+        logger.info(f"کاربر {user_id} عضو است: {is_member}")
+        return is_member
+        
     except Exception as e:
-        logger.error(f"خطا در بررسی عضویت کانال: {e}")
+        logger.error(f"خطا در بررسی عضویت کانال برای کاربر {user_id}: {e}")
+        # اگر خطا رخ داد، فرض می‌کنیم کاربر عضو نیست
         return False
 
 async def verify_membership(update: Update, context: CallbackContext) -> None:
@@ -82,31 +92,58 @@ async def verify_membership(update: Update, context: CallbackContext) -> None:
     await query.answer()
     
     user_id = query.from_user.id
+    logger.info(f"درخواست بررسی عضویت از کاربر {user_id}")
     
-    is_member = await check_channel_membership(user_id, context)
-    
-    if is_member:
-        user_status[user_id] = "verified"
-        await query.edit_message_text(
-            "✅ عضویت شما تأیید شد!\n\n"
-            "حالا می‌توانید اطلاعات خود را به این فرمت ارسال کنید:\n"
-            "نام و نام خانوادگی،شماره دانشجویی\n\n"
-            "مثال:\n"
-            "بهنام احمدی،14044121000"
-        )
-    else:
-        keyboard = [
-            [InlineKeyboardButton("📢 عضویت در کانال", url=CHANNEL_LINK)],
-            [InlineKeyboardButton("✅ بررسی مجدد عضویت", callback_data="verify_membership")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+    try:
+        # بررسی مجدد وضعیت عضویت
+        is_member = await check_channel_membership(user_id, context)
+        
+        if is_member:
+            # ذخیره وضعیت تأیید شده
+            user_status[user_id] = {
+                "verified": True,
+                "timestamp": time.time()
+            }
+            
+            logger.info(f"عضویت کاربر {user_id} تأیید شد")
+            
+            await query.edit_message_text(
+                "✅ عضویت شما تأیید شد!\n\n"
+                "حالا می‌توانید اطلاعات خود را به این فرمت ارسال کنید:\n"
+                "نام و نام خانوادگی،شماره دانشجویی\n\n"
+                "مثال:\n"
+                "بهنام احمدی،14044121000"
+            )
+        else:
+            # حذف وضعیت قبلی کاربر (اگر وجود داشت)
+            if user_id in user_status:
+                del user_status[user_id]
+            
+            logger.info(f"کاربر {user_id} هنوز عضو نیست")
+            
+            keyboard = [
+                [InlineKeyboardButton("📢 عضویت در کانال", url=CHANNEL_LINK)],
+                [InlineKeyboardButton("🔄 بررسی مجدد عضویت", callback_data="verify_membership")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                "❌ هنوز در کانال عضو نیستید!\n\n"
+                "⚠️ توجه: پس از عضویت در کانال، کمی صبر کنید (۱۰-۲۰ ثانیه)\n"
+                "سپس روی دکمه 'بررسی مجدد عضویت' کلیک کنید.\n\n"
+                f"🔗 لینک کانال: {CHANNEL_LINK}",
+                reply_markup=reply_markup
+            )
+            
+    except Exception as e:
+        logger.error(f"خطا در تایید عضویت کاربر {user_id}: {e}")
         
         await query.edit_message_text(
-            "❌ هنوز در کانال عضو نیستید!\n\n"
-            "1. روی دکمه 'عضویت در کانال' کلیک کنید\n"
-            "2. پس از عضویت، روی 'بررسی مجدد عضویت' کلیک کنید\n\n"
-            f"🔗 لینک کانال: {CHANNEL_LINK}",
-            reply_markup=reply_markup
+            "⚠️ خطا در بررسی عضویت. لطفاً دوباره تلاش کنید.\n\n"
+            "روی دکمه زیر کلیک کنید:",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 تلاش مجدد", callback_data="verify_membership")]
+            ])
         )
 
 async def handle_message(update: Update, context: CallbackContext) -> None:
@@ -116,7 +153,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         logger.info(f"پیام دریافتی از {user_id}: {text}")
         
         # بررسی وضعیت تأیید کاربر
-        if user_id not in user_status or user_status[user_id] != "verified":
+        if user_id not in user_status or not user_status[user_id].get("verified", False):
             # اگر کاربر تأیید نشده، پیام عضویت نشان داده شود
             keyboard = [
                 [InlineKeyboardButton("📢 عضویت در کانال", url=CHANNEL_LINK)],
@@ -127,7 +164,8 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
             await update.message.reply_text(
                 "👋 برای استفاده از ربات، ابتدا باید در کانال ما عضو شوید:\n\n"
                 "1. روی دکمه 'عضویت در کانال' کلیک کنید\n"
-                "2. پس از عضویت، روی 'بررسی عضویت من' کلیک کنید\n\n"
+                "2. پس از عضویت، ۱۰-۲۰ ثانیه صبر کنید\n"
+                "3. سپس روی 'بررسی عضویت من' کلیک کنید\n\n"
                 f"🔗 کانال: {CHANNEL_LINK}",
                 reply_markup=reply_markup
             )
@@ -169,14 +207,17 @@ async def start(update: Update, context: CallbackContext) -> None:
     برای دریافت نمره ابتدا باید در کانال ما عضو شوید:
     
     1️⃣ روی دکمه 'عضویت در کانال' کلیک کنید
-    2️⃣ پس از عضویت، روی 'بررسی عضویت من' کلیک کنید
+    2️⃣ پس از عضویت، ۱۰-۲۰ ثانیه صبر کنید
+    3️⃣ سپس روی 'بررسی عضویت من' کلیک کنید
     
-    سپس اطلاعات خود را به این شکل ارسال کنید:
+    بعد از تأیید عضویت، اطلاعات خود را به این شکل ارسال کنید:
     
     نام و نام خانوادگی،شماره دانشجویی
     
     مثال:
     بهنام احمدی،14044121000
+    
+    ⚠️ توجه: پس از عضویت در کانال، کمی صبر کنید تا سیستم به‌روزرسانی شود.
     """
     
     await update.message.reply_text(welcome_text, reply_markup=reply_markup)
