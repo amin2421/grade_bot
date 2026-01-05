@@ -10,13 +10,12 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackCo
 from flask import Flask
 
 TOKEN = "8255204107:AAF4_v6kvDiYZEuOuwClrh4Dd4MHGhOWpFE"
+CHANNEL_ID = "@With_u_until_end"  # آیدی کانال شما
 
-# ========== خطایابی اولیه ==========
 print("=" * 50)
 print(f"شروع اجرا در: {time.ctime()}")
 print("=" * 50)
 
-# ========== سرور وب Flask ==========
 try:
     web_app = Flask(__name__)
     print("✅ Flask وارد شد")
@@ -40,7 +39,6 @@ def run_web_server():
     except Exception as e:
         print(f"❌ خطای سرور وب: {e}")
 
-# ========== ربات تلگرام ==========
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -48,7 +46,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def search_grade(name: str, student_id: str) -> str:
-    """جستجوی نمره در فایل CSV"""
     try:
         if not os.path.exists('grades.csv'):
             print("❌ فایل grades.csv یافت نشد!")
@@ -66,11 +63,30 @@ def search_grade(name: str, student_id: str) -> str:
         logger.error(f"خطا در جستجوی نمره: {e}")
         return None
 
-async def handle_message(update: Update, context: CallbackContext) -> None:
-    """پردازش پیام کاربر"""
+async def check_channel_membership(user_id: int, context: CallbackContext) -> bool:
+    """بررسی عضویت کاربر در کانال"""
     try:
+        member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
+        return member.status in ['member', 'administrator', 'creator']
+    except Exception as e:
+        logger.error(f"خطا در بررسی عضویت کانال: {e}")
+        return False
+
+async def handle_message(update: Update, context: CallbackContext) -> None:
+    try:
+        user_id = update.effective_user.id
         text = update.message.text.strip()
-        logger.info(f"پیام دریافتی: {text}")
+        logger.info(f"پیام دریافتی از {user_id}: {text}")
+        
+        # بررسی عضویت در کانال
+        is_member = await check_channel_membership(user_id, context)
+        if not is_member:
+            await update.message.reply_text(
+                '⚠️ برای دریافت نمره باید در کانل ما عضو باشید:\n'
+                'https://t.me/+29MDo7noLR0xMzZk\n'
+                'پس از عضویت، مجدداً اطلاعات خود را ارسال کنید.'
+            )
+            return
         
         # جدا کردن نام و شماره دانشجویی
         if '،' in text:
@@ -96,7 +112,6 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         logger.error(f"خطا در پردازش پیام: {e}")
 
 async def start(update: Update, context: CallbackContext) -> None:
-    """دستور /start"""
     welcome_text = """
     سلام! 👋
     
@@ -106,36 +121,33 @@ async def start(update: Update, context: CallbackContext) -> None:
     
     مثال:
     بهنام احمدی،14044121000
+    
+    ⚠️ توجه: برای استفاده از ربات باید در کانال ما عضو باشید:
+    https://t.me/+29MDo7noLR0xMzZk
     """
     await update.message.reply_text(welcome_text)
 
 def main():
-    """تابع اصلی"""
     print("🚀 در حال راه‌اندازی سرویس...")
     
-    # راه‌اندازی سرور وب در نخ جداگانه
     server_thread = Thread(target=run_web_server, daemon=True)
     server_thread.start()
     print("🌐 سرور وب فعال شد")
-    time.sleep(1)  # فرصت برای شروع سرور
+    time.sleep(1)
     
-    # راه‌اندازی ربات تلگرام
     try:
         print("🤖 در حال راه‌اندازی ربات تلگرام...")
         application = Application.builder().token(TOKEN).build()
         
-        # ثبت دستورات
         application.add_handler(CommandHandler("start", start))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
         print("✅ ربات تلگرام آماده است!")
         print("=" * 50)
         
-        # اجرای ربات - پارامتر مشکل‌دار حذف شد
         application.run_polling(
             drop_pending_updates=True,
             allowed_updates=Update.ALL_TYPES,
-            # close_loop_on_sigint=True  # این خط حذف شد
         )
         
     except Exception as e:
