@@ -9,7 +9,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext, filters, CallbackQueryHandler
 from flask import Flask
 
-TOKEN = "8255204107:AAF4_v6kvDiYZEuOuwClrh4Dd4MHGhOWpFE"
+TOKEN = "8373790497:AAGvm1mSOsHx0FRGjXZ9jz_gmsRcxFOCnEg"
 CHANNEL_ID = -1003457817555  # آیدی عددی واقعی کانال شما
 CHANNEL_USERNAME = "@With_u_until_end"
 CHANNEL_LINK = "https://t.me/+uRCMurkr0KA5ODNk"
@@ -338,3 +338,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
